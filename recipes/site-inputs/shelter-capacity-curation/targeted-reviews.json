@@ -907,6 +907,184 @@
     }
   },
   {
+    "msa_id": "39540",
+    "first_year": 2010,
+    "last_year": 2011,
+    "decision": "accept",
+    "reason": "Accept on the available evidence of comparable within-pair coverage. The CoC describes longstanding countywide fieldwork, and available records identify no break within this pair.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2011,
+    "last_year": 2012,
+    "decision": "accept",
+    "reason": "Accept on the available evidence of comparable within-pair coverage. The CoC describes longstanding countywide fieldwork, and available records identify no break within this pair.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2012,
+    "last_year": 2013,
+    "decision": "accept",
+    "reason": "Accept on the available evidence of comparable within-pair coverage. The CoC describes longstanding countywide fieldwork, and available records identify no break within this pair.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2013,
+    "last_year": 2014,
+    "decision": "accept",
+    "reason": "Accept on the available evidence of comparable within-pair coverage. The CoC describes longstanding countywide fieldwork, and available records identify no break within this pair.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2014,
+    "last_year": 2015,
+    "decision": "accept",
+    "reason": "Accept on the available evidence of comparable within-pair coverage. The CoC describes longstanding countywide fieldwork, and available records identify no break within this pair.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2015,
+    "last_year": 2016,
+    "decision": "accept",
+    "reason": "Both January counts precede the documented November 2016 adoption of combined street and service-based counting. The study accepts the pair on the available evidence of comparable coverage.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ]
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2016,
+    "last_year": 2017,
+    "decision": "exclude",
+    "reason": "Exclude this pair because the CoC adopted combined street and service-based counting in November 2016, between the January counts.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29",
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+    ],
+    "count_method": {
+      "note": "Documented change in unsheltered count methodology between the January endpoints. The November 2016 approval combined street and service-based counts.",
+      "sources": [
+        "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29",
+        "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      ]
+    }
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2017,
+    "last_year": 2018,
+    "decision": "exclude",
+    "reason": "Exclude this pair because teams searched previously excluded areas by at least 2018 and January 2017 coverage of those areas remains unverified.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+    ],
+    "count_method": {
+      "note": "Possible change in field coverage between the January endpoints. The 2019 application describes the same overall method after November 2016. January 2017 coverage of areas searched by at least 2018 remains unverified.",
+      "sources": [
+        "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+        "https://racinecoc.org/sites/default/files/inline-files/App-Final-with-all-attachments%20NOFA%202019.pdf#page=29"
+      ]
+    }
+  },
+  {
+    "msa_id": "39540",
+    "first_year": 2024,
+    "last_year": 2025,
+    "decision": "accept",
+    "reason": "The June 2024 policy reaffirmed full-county coverage. The February 2025 minutes identify the January count as countywide and match HUD with 13 unsheltered and 180 sheltered. Retain the published 19 to 13 unsheltered and 251 to 224 year-round shelter beds.",
+    "members": {
+      "WI-502": {
+        "jurisdiction": "Racine County",
+        "scope_ref": "https://racinecoc.org/sites/default/files/inline-files/02212025%20Alliance%20February%20meeting%20notes_0.pdf#page=2"
+      }
+    },
+    "sources": [
+      "https://racinecoc.org/sites/default/files/inline-files/2024.6.10%20LC%20Minutes.pdf#page=3",
+      "https://racinecoc.org/sites/default/files/inline-files/02212025%20Alliance%20February%20meeting%20notes_0.pdf#page=2",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_WI-502-2024_WI_2024.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_PopSub_CoC_WI-502-2025_WI_2025.pdf",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_WI-502-2024_WI_2024.pdf#page=2",
+      "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_WI-502-2025_WI_2025.pdf#page=2"
+    ],
+    "bed_count_sensitivity": {
+      "note": "HALO accounts for the full 27-bed decline in reported year-round shelter inventory. Its men's shelter falls from 67 to 50 beds and its women's and family shelter from 60 to 50. Retain 251 and 224 published year-round beds. The duration of the lower reported capacity remains uncertain.",
+      "sources": [
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_WI-502-2024_WI_2024.pdf#page=2",
+        "https://files.hudexchange.info/reports/published/CoC_HIC_CoC_WI-502-2025_WI_2025.pdf#page=2"
+      ]
+    }
+  },
+  {
     "msa_id": "39740",
     "first_year": 2024,
     "last_year": 2025,
