@@ -1,6 +1,6 @@
 # Shelter-capacity sample curation
 
-This is the November 27, 2026 working review for `subst_fd`, the primary first-difference analysis. It records **513 accepted** and **50 open** adjacent-year pairs across 563 candidates. The 2024–25 transition has **44 accepted of 48**. The stricter boundary sensitivity subset contains **101** accepted pairs. The production example currently ends in 2024, and this ledger documents the extended working sample before a production model fit.
+This is the November 27, 2026 working review for `subst_fd`, the primary first-difference analysis. It records **513 accepted, 11 excluded by study decision, and 39 open** adjacent-year pairs across 563 candidates. The 2024–25 transition has **44 accepted, one excluded, and three open**. The stricter boundary sensitivity subset contains **101** accepted pairs. The production example currently ends in 2024, and this ledger documents the extended working sample before a production model fit.
 
 ## Find a decision
 
@@ -9,9 +9,9 @@ This is the November 27, 2026 working review for `subst_fd`, the primary first-d
 | [Pair decisions](pair-decisions.csv) | Search by Census MSA ID, name, and first and last year. The row records the disposition, member CoCs, open questions, and any count or capacity flags. |
 | [CoC-year scopes](coc-year-scopes.csv) | Search by HUD CoC ID and count year. The row records PIT and HIC scope separately, the contributing source CoCs, the aggregation operation, and the evidence or remaining question. |
 | [Targeted reviews](targeted-reviews.json) | Search by MSA ID or CoC ID for 41 individual reviews. Each entry carries its rationale, dated scope sources, and any structured count override or data annotation. |
-| [Source manifest](source-manifest.json) | Find the exact frozen roster of 64 Census MSAs and 84 CoCs, the source vintages and identifiers, and the recorded input fingerprints. |
+| [Source manifest](source-manifest.json) | Find the exact frozen roster of 64 Census MSAs and 84 CoCs, confirmed whole-metro holdouts, source vintages and identifiers, and recorded input fingerprints. |
 
-The pair ledger's `targeted_review` field points to the matching `msa_id`, `first_year`, and `last_year` in the JSON. Earlier holdouts remain visible on the pair even when some member CoC-years have suitable reporting scope. In the CoC-year table a blank `working_scope_status` marks retained evidence for a year outside the candidate endpoints. An `unknown` PIT or HIC status calls for evidence before using that source. Fields with several IDs, endpoints, or references use ` | ` as the delimiter. `asset:` references name source or intermediate artifacts stored outside Git. Paths beginning with `docs/` or `data/` are relative to the repository root.
+The pair ledger's `targeted_review` field points to the matching `msa_id`, `first_year`, and `last_year` in the JSON. Confirmed whole-metro holdouts are keyed by `msa_id` in the manifest's `confirmed_msa_holdouts` and appear as `excluded_by_study_decision` in the pair ledger. The CoC-year table tracks the availability and scope of each source independently of metro-level inclusion. A blank `working_scope_status` marks retained evidence for a year outside the candidate endpoints. An `unknown` PIT or HIC status calls for evidence before using that source. Fields with several IDs, endpoints, or references use ` | ` as the delimiter. `asset:` references name source or intermediate artifacts stored outside Git. Paths beginning with `docs/` or `data/` are relative to the repository root.
 
 ### Examples
 
@@ -26,7 +26,10 @@ The pair ledger's `targeted_review` field points to the matching `msa_id`, `firs
 | 12980 Battle Creek and 19660 Deltona–Daytona Beach–Ormond Beach, 2024–25 | Retain the published year-round inventory and flag the temporary beds in Battle Creek and the First Step Shelter entries in Deltona. |
 | 34940 Naples–Marco Island and 15980 Cape Coral–Fort Myers, 2024–25 | Assign the presumed duplicate St. Matthew's House facility to Lee using its 65-bed entry. Adjust Collier from 538 to 470 beds and keep 538 for sensitivity. |
 | 37340 Palm Bay–Melbourne–Titusville, 2024–25 | Retain the published PIT counts and flag the 213 cold-night shelter guests counted as unsheltered in Brevard in 2025. |
+| 31700 Manchester–Nashua, all 11 candidate pairs | Hold out the metro. The documented service areas cover 74.1% of its residents, and compatible PIT and HIC data for the Balance of State towns remain unverified. |
 | 41420 Salem, 2022–23 | Keep open pending disposition of the earlier whole-site holdout. |
+
+HUD's FY2025 preliminary funding figure for NH-502 is $762,649, exactly the sum of its Nashua and Hillsborough County geocode amounts. The funding figures identify the geographic codes used for the preliminary calculation. Assessing PIT and HIC coverage still requires the towns and projects behind the reported counts. [HUD FY2025 geographic code report](https://www.hud.gov/sites/default/files/CPD/documents/CoC/FY-2025-GeoCodes-PPRN-Report.pdf) · [HUD FY2025 renewal demand report](https://www.hud.gov/sites/dfiles/CPD/documents/CoC/FY25-CoC-Estimated-Annual-Renewal-Demand-Amount-Report.pdf)
 
 ## Review rules
 
