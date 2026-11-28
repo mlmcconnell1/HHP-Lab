@@ -808,6 +808,88 @@
   },
   {
     "msa_id": "34940",
+    "first_year": 2010,
+    "last_year": 2011,
+    "decision": "accept",
+    "reason": "The two HUD maps differ by about 25 square meters. The local plan reports the same countywide PIT totals as HUD for both years. Accept the published figures and flag the change in bed inventory.",
+    "members": {
+      "FL-606": {
+        "jurisdiction": "Collier County",
+        "scope_ref": "asset:historical-site-selection/remaining-boundary-checks-20261119/approved-footnote-revision/annual-comparisons.csv",
+        "historical_scope_basis": "The 2010 and 2011 HUD maps show the same administrative area to map precision. The local ten-year plan gives the same 401 and 390 countywide PIT totals as HUD. Exact count-night search routes and facility assignments remain uncertain."
+      }
+    },
+    "sources": [
+      "https://collierhomelesscoalition.org/wp-content/uploads/2018/03/20-20-Revision-August-2017.pdf",
+      "https://www.va.gov/HOMELESS/docs/PIT-HIC_SupplementalAHARReport.pdf",
+      "https://www.huduser.gov/portal/sites/default/files/xls/2007-2025-HIC-Counts-by-CoC.xlsx",
+      "asset:historical-site-selection/remaining-boundary-checks-20261119/approved-footnote-revision/annual-comparisons.csv"
+    ],
+    "bed_count_sensitivity": {
+      "note": "Year-round emergency beds rise from 166 to 244 and transitional beds fall from 100 to 96. Overflow beds fall from 49 to 15. The project-level reason is unverified. Use the published year-round totals of 266 and 340 in the primary analysis.",
+      "sources": [
+        "https://www.huduser.gov/portal/sites/default/files/xls/2007-2025-HIC-Counts-by-CoC.xlsx"
+      ]
+    }
+  },
+  {
+    "msa_id": "34940",
+    "first_year": 2013,
+    "last_year": 2014,
+    "decision": "accept",
+    "reason": "The approved map repair restores the two omitted cities, and the local coalition documents its 2014 count in Naples. Accept the published HUD figures for continuing Collier County scope with a flag on the disagreement over the 2013 PIT total.",
+    "members": {
+      "FL-606": {
+        "jurisdiction": "Collier County",
+        "scope_ref": "docs/historical-coc-archive-availability.md#fl-606-naples-and-marco-island-2026-10-27",
+        "historical_scope_basis": "The approved map repair restores the omitted Naples and Marco Island footprints. Dated coalition and state records support continuing Collier County scope. Exact count-night search routes and facility assignments remain uncertain."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#fl-606-naples-and-marco-island-2026-10-27",
+      "asset:historical-site-selection/remaining-boundary-checks-20261119/approved-footnote-revision/annual-comparisons.csv",
+      "https://collierhomelesscoalition.org/category/blog/",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30",
+      "https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb"
+    ],
+    "count_method": {
+      "note": "HUD reports 396 total people in 2013 and Florida reports 375. The difference of 21 cannot be assigned to sheltered or unsheltered counts from the state table. Both sources report 361 total in 2014. Use HUD's unsheltered counts of 54 and 35 in the primary analysis. Omit this pair in a sensitivity fit until a comparable alternate unsheltered count is available.",
+      "sources": [
+        "https://www.huduser.gov/portal/sites/default/files/xls/2007-2024-PIT-Counts-by-CoC.xlsb",
+        "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30"
+      ]
+    }
+  },
+  {
+    "msa_id": "34940",
+    "first_year": 2014,
+    "last_year": 2015,
+    "decision": "accept",
+    "reason": "The approved map repair reduces the 2014–15 difference from about 84.3 km² to 0.013 km². The coalition documents outreach in Naples and Immokalee in both years. Accept the published figures and flag possible changes in surveying and the documented change in youth reporting.",
+    "members": {
+      "FL-606": {
+        "jurisdiction": "Collier County",
+        "scope_ref": "docs/historical-coc-archive-availability.md#fl-606-naples-and-marco-island-2026-10-27",
+        "historical_scope_basis": "The approved map repair restores the omitted Naples and Marco Island footprints. Dated coalition and state records support continuing Collier County scope. Exact count-night search routes and facility assignments remain uncertain."
+      }
+    },
+    "sources": [
+      "docs/historical-coc-archive-availability.md#fl-606-naples-and-marco-island-2026-10-27",
+      "asset:historical-site-selection/remaining-boundary-checks-20261119/approved-footnote-revision/annual-comparisons.csv",
+      "https://collierhomelesscoalition.org/category/blog/",
+      "https://collierhomelesscoalition.org/wp-content/uploads/2013/11/July-2015-DRAFT-CoC-Minutes.pdf",
+      "https://www.pascohomelesscoalition.org/wp-content/uploads/2012/01/Council-on-Homelessness-2015-Report.pdf#page=30"
+    ],
+    "count_method": {
+      "note": "The 2015 CoC draft minutes cite possibly better surveying and a narrower definition of unaccompanied youth. The effect on the overall unsheltered count is uncertain. Use the published PIT figures.",
+      "sources": [
+        "https://collierhomelesscoalition.org/category/blog/",
+        "https://collierhomelesscoalition.org/wp-content/uploads/2013/11/July-2015-DRAFT-CoC-Minutes.pdf"
+      ]
+    }
+  },
+  {
+    "msa_id": "34940",
     "first_year": 2024,
     "last_year": 2025,
     "decision": "accept",
